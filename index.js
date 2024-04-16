@@ -52,7 +52,8 @@ class TuyaDevice extends EventEmitter {
     nullPayloadOnJSONError = false,
     issueGetOnConnect = true,
     issueRefreshOnConnect = false,
-    issueRefreshOnPing = false
+    issueRefreshOnPing = false,
+    issueSequenceN = false,
   } = {}) {
     super();
 
@@ -64,6 +65,8 @@ class TuyaDevice extends EventEmitter {
       issueRefreshOnConnect,
       issueRefreshOnPing
     };
+
+    this.issueSequenceN = issueSequenceN;
 
     this.nullPayloadOnJSONError = nullPayloadOnJSONError;
 
@@ -712,6 +715,11 @@ class TuyaDevice extends EventEmitter {
         return;
       }
 
+      if (this.issueSequenceN) {
+        this._currentSequenceN = packet.sequenceN - 1;
+        debug(`New _currentSequenceN: ${this._currentSequenceN}`);
+      }
+      
       // 16 bytes _tmpRemoteKey and hmac on _tmpLocalKey
       this._tmpRemoteKey = packet.payload.subarray(0, 16);
       debug('Protocol 3.4: Local Random Key: ' + this._tmpLocalKey.toString('hex'));
@@ -758,6 +766,7 @@ class TuyaDevice extends EventEmitter {
 
     if (packet.commandByte === CommandType.HEART_BEAT) {
       debug(`Pong from ${this.device.ip}`);
+      // this._currentSequenceN = packet.sequenceN;
       /**
        * Emitted when a heartbeat ping is returned.
        * @event TuyaDevice#heartbeat
@@ -845,6 +854,10 @@ class TuyaDevice extends EventEmitter {
       packet.commandByte === CommandType.STATUS &&
       typeof this._setResolver === 'function'
     ) {
+      if (this.issueSequenceN) {
+        this._currentSequenceN = packet.sequenceN;
+        debug(`New _currentSequenceN: ${this._currentSequenceN}`);
+      }
       this._setResolver(packet.payload);
 
       // Remove resolver
